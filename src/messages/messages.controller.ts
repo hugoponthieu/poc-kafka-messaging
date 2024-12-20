@@ -1,4 +1,15 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  Sse,
+} from '@nestjs/common';
+import { Observable, interval } from 'rxjs';
+import { map } from 'rxjs/operators';
 import { MessagesService } from './messages.service';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { UpdateMessageDto } from './dto/update-message.dto';
@@ -30,5 +41,11 @@ export class MessagesController {
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.messagesService.remove(+id);
+  }
+  @Sse('sse')
+  sse(): Observable<MessageEvent> {
+    return interval(1000).pipe(
+      map((_) => ({ data: { hello: 'world' } }) as MessageEvent),
+    );
   }
 }
