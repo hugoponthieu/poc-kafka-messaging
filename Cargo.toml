@@ -1,0 +1,10 @@
+[package]
+name = "poc-kafka"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.94"
+kafka = "0.10.0"
+tracing = "0.1.41"
+tracing-subscriber = "0.3.19"

@@ -6,3 +6,10 @@ services:
     image: apache/kafka
     ports:
       - '9092:9092'
+
+
+# CREATE A TOPIC
+# docker exec -it first-course-kafka-1 /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --topic first-course
+
+# CONNECT TO THE CONTAINER & SEND MESSAGES
+# docker exec --workdir /opt/kafka/bin/ -it first-course-kafka-1 sh ./kafka-console-producer.sh --bootstrap-server localhost:9092 --topic first-course
