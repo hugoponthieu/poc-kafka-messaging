@@ -1,38 +1,23 @@
-use std::{
-    io::{self, Write},
-    time::Duration,
-};
+use std::{io::{self, Write}, time::Duration};
 
 use kafka::{
-    client::{FetchOffset, GroupOffsetStorage, KafkaClient},
-    consumer::Consumer,
-    Error,
+    client::{FetchOffset, GroupOffsetStorage, KafkaClient, RequiredAcks}, consumer::Consumer, producer::{Producer, Record}, Error
 };
 
 pub fn process_by_client() -> Result<(), Error> {
-    let client = KafkaClient::new(vec!["localhost:9092".to_owned()]);
     println!("client");
     let mut c = {
-        let mut cb = Consumer::from_client(client)
-            .with_group("kafka-rust-console-consumer".to_owned())
-            .with_client_id("kafka-rust-console-consumer".to_owned())
-            // .with_fetch_max_wait_time(Duration::from_secs(1))
-            // .with_fetch_min_bytes(1_000)
-            // .with_fetch_max_bytes_per_partition(100_000)
-            // .with_retry_max_bytes_limit(1_000_000)
+        let mut client = KafkaClient::new(vec!["localhost:9092".to_owned()]);
+        client.load_metadata_all().unwrap();
+
+        let builder = Consumer::from_client(client);
+        let mut cb = builder
             .with_group("group".to_owned())
             .with_fallback_offset(FetchOffset::Latest)
             .with_offset_storage(Some(GroupOffsetStorage::Kafka));
-        println!(
-            "after config
-            ",
-        );
-        cb = cb.with_topic("first-course".to_owned()); 
+        cb = cb.with_topic("first-course".to_owned());
         cb.create()?
     };
-
-    println!("connext");
-
     let stdout = io::stdout();
     let mut stdout = stdout.lock();
     let mut buf = Vec::with_capacity(1024);
@@ -56,5 +41,24 @@ pub fn process_by_client() -> Result<(), Error> {
             }
             let _ = c.consume_messageset(ms);
         }
+    }
+}
+
+
+pub fn produce_messages() {
+    let mut producer = Producer::from_hosts(vec!["localhost:9092".to_owned()])
+        
+        .with_ack_timeout(Duration::from_secs(1))
+        .with_required_acks(RequiredAcks::One)
+        .create()
+        .unwrap();
+
+    let mut buf = Vec::with_capacity(1024);
+    for i in 0..10 {
+        let _ = write!(buf, "{}", i); // some computation of the message data to be sent
+        producer
+            .send(&Record::from_key_value("first-course", "key", "value"))
+            .unwrap();
+        buf.clear();
     }
 }
