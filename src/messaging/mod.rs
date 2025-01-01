@@ -1,64 +1,59 @@
-use std::{io::{self, Write}, time::Duration};
-
-use kafka::{
-    client::{FetchOffset, GroupOffsetStorage, KafkaClient, RequiredAcks}, consumer::Consumer, producer::{Producer, Record}, Error
+use std::{
+    convert::Infallible,
+    sync::{Arc, Mutex},
 };
 
-pub fn process_by_client() -> Result<(), Error> {
-    println!("client");
-    let mut c = {
-        let mut client = KafkaClient::new(vec!["localhost:9092".to_owned()]);
-        client.load_metadata_all().unwrap();
+use axum::response::sse::Event;
+use rdkafka::{
+    config::ClientConfig,
+    consumer::{Consumer, StreamConsumer},
+    Message,
+};
+use tokio_stream::wrappers::UnboundedReceiverStream;
 
-        let builder = Consumer::from_client(client);
-        let mut cb = builder
-            .with_group("group".to_owned())
-            .with_fallback_offset(FetchOffset::Latest)
-            .with_offset_storage(Some(GroupOffsetStorage::Kafka));
-        cb = cb.with_topic("first-course".to_owned());
-        cb.create()?
-    };
-    let stdout = io::stdout();
-    let mut stdout = stdout.lock();
-    let mut buf = Vec::with_capacity(1024);
+pub fn stream_kafka_events_rdkafka() -> impl tokio_stream::Stream<Item = Result<Event, Infallible>>
+{
+    use tokio_stream::StreamExt;
+    let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<String>();
+    let tx = Arc::new(Mutex::new(tx));
 
-    loop {
-        let message_sets: kafka::consumer::MessageSets = match c.poll() {
-            Ok(ms) => ms,
-            Err(e) => {
-                println!("here");
-                return Err(e);
+    tokio::spawn(async move {
+        let consumer: StreamConsumer = ClientConfig::new()
+            .set("group.id", "group")
+            .set("bootstrap.servers", "localhost:9092")
+            .set("enable.partition.eof", "false")
+            .set("session.timeout.ms", "6000")
+            .set("enable.auto.commit", "true")
+            .create()
+            .expect("Consumer creation failed");
+
+        consumer
+            .subscribe(&["first-course"])
+            .expect("Can't subscribe to specified topic");
+
+        let mut message_stream = consumer.stream();
+
+        while let Some(message) = message_stream.next().await {
+            match message {
+                Ok(borrowed_message) => {
+                    let payload = borrowed_message.payload().unwrap_or(&[]);
+                    let message_str = String::from_utf8_lossy(payload);
+                    tracing::info!(%message_str);
+                    if let Err(e) = tx.lock().unwrap().send(message_str.to_string()) {
+                        println!("Failed to send message: {}", e);
+                        return;
+                    }
+                    tracing::info!("message sent");
+                }
+                Err(e) => {
+                    println!("Failed to receive message: {}", e);
+                    return;
+                }
             }
-        };
-
-        for ms in message_sets.iter() {
-            for m in ms.messages() {
-                let _ = println!("{}:{}@{}:", ms.topic(), ms.partition(), m.offset);
-                buf.extend_from_slice(m.value);
-                buf.push(b'\n');
-                stdout.write_all(&buf)?;
-                buf.clear();
-            }
-            let _ = c.consume_messageset(ms);
         }
-    }
-}
+    });
 
-
-pub fn produce_messages() {
-    let mut producer = Producer::from_hosts(vec!["localhost:9092".to_owned()])
-        
-        .with_ack_timeout(Duration::from_secs(1))
-        .with_required_acks(RequiredAcks::One)
-        .create()
-        .unwrap();
-
-    let mut buf = Vec::with_capacity(1024);
-    for i in 0..10 {
-        let _ = write!(buf, "{}", i); // some computation of the message data to be sent
-        producer
-            .send(&Record::from_key_value("first-course", "key", "value"))
-            .unwrap();
-        buf.clear();
-    }
+    UnboundedReceiverStream::new(rx).map(|msg: String| {
+        Ok(Event::default().data(msg)) // Map message into SSE Event
+    })
 }
