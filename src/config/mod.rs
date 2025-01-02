@@ -6,6 +6,9 @@ pub struct AppConfig {
     #[arg(long, env = "KAFKA_HOST", default_value = "127.0.0.1:9092")]
     pub kafka_host: String,
 
+    #[arg(long, env = "MONGODB_HOST", default_value = "mongodb://localhost:27017")]
+    pub mongodb_host: String,
+
     #[arg(long, env = "HTTP_HOST", default_value = "localhost")]
     pub http_host: String,
 
@@ -33,6 +36,7 @@ impl AppConfigTrait for AppConfig {
     fn builder() -> AppConfig {
         AppConfig {
             kafka_host: String::new(),
+            mongodb_host: String::new(),
             http_host: String::new(),
             http_port: 0,
         }
@@ -42,6 +46,7 @@ impl AppConfigTrait for AppConfig {
         let args = AppConfig::parse();
         let config = AppConfig {
             kafka_host: args.kafka_host,
+            mongodb_host: args.mongodb_host,
             http_host: args.http_host,
             http_port: args.http_port,
         };
@@ -64,6 +69,7 @@ impl AppConfigTrait for AppConfig {
     fn default() -> Self {
         AppConfig {
             kafka_host: "localhost:9092".to_string(),
+            mongodb_host: "mongodb://localhost:27017".to_string(),
             http_host: "localhost".to_string(),
             http_port: 8080,
         }
@@ -71,6 +77,7 @@ impl AppConfigTrait for AppConfig {
 
     fn log_config(&self) {
         tracing::info!("Kafka Host: {}", self.kafka_host);
+        tracing::info!("MongoDB Host: {}", self.mongodb_host);
         tracing::info!("HTTP Host: {}", self.http_host);
         tracing::info!("HTTP Port: {}", self.http_port);
     }

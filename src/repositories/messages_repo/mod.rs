@@ -59,14 +59,14 @@ impl MessagesRepoTrait for MessagesRepo {
                                 tracing::info!("message sent");
                             }
                             Err(e) => {
-                                println!("Failed to receive message: {}", e);
+                                tracing::error!("Failed to receive message: {}", e);
                                 return;
                             }
                         };
                         tracing::info!("message sent");
                     }
                     Err(e) => {
-                        println!("Failed to receive message: {}", e);
+                        tracing::error!("Failed to receive message: {}", e);
                         return;
                     }
                 }

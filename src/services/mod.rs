@@ -1,6 +1,10 @@
-use kafka_client::KafkaClientTrait;
-pub mod kafka_client;
+use std::error::Error;
 
+use futures::TryFutureExt;
+use kafka_client::KafkaClientTrait;
+use mongodb_client::MongoDBClientTrait;
+pub mod kafka_client;
+pub mod mongodb_client;
 /// The `Services` struct encapsulates various service clients, including a Kafka client.
 ///
 /// # Fields
@@ -14,15 +18,20 @@ pub mod kafka_client;
 /// ```
 pub struct Services {
     pub kafka_client: kafka_client::KafkaClient,
+    pub mongodb_client: mongodb_client::MongoDBClient,
 }
 
 pub trait ServicesTrait: Send + Sync {
-    fn build(kafka_host: &str) -> Services;
+    async fn build(kafka_host: &str, mongodb_host: &str) -> Result<Services, Box<dyn Error>>;
 }
 
 impl ServicesTrait for Services {
-    fn build(kafka_host: &str) -> Services {
+    async fn build(kafka_host: &str, mongodb_host: &str) -> Result<Services, Box<dyn Error>> {
         let kafka_client = kafka_client::KafkaClient::build(kafka_host);
-        Services { kafka_client }
+        let mongodb_client = mongodb_client::MongoDBClient::build(mongodb_host).await?;
+        Ok(Services {
+            kafka_client,
+            mongodb_client,
+        })
     }
 }
