@@ -1,18 +1,31 @@
-use std::fmt::Error;
-
 use axum::response::sse::Event;
-use futures::Stream;
+use tokio::{sync::mpsc::UnboundedSender, task::AbortHandle};
 use tokio_stream::StreamExt;
 
 use crate::repositories::{messages_repo::MessagesRepoTrait, Repositories};
 
 pub async fn stream_kafka_events_rdkafka(
     state: Repositories,
-) -> impl Stream<Item = Result<Event, Error>> {
+    message_input: UnboundedSender<Event>,
+) -> AbortHandle {
     let messages_repo = state.messages_repo.clone();
     let repo = messages_repo.read().await;
-
     // Get the stream and map it to Events
-    repo.get_topic_message_stream()
-        .map(|result| result.map(|msg| Event::default().data(msg)))
+    let (mut raw_stream, handle_streaming_end) = repo.get_topic_message_stream();
+
+    tokio::spawn(async move {
+        while let Some(message) = raw_stream.next().await {
+            match message {
+                Ok(msg) => {
+                    let _ = message_input.send(Event::default().data(msg));
+                }
+                Err(e) => {
+                    println!("Failed to receive message: {}", e);
+                    return;
+                }
+            }
+        }
+    });
+
+    handle_streaming_end
 }

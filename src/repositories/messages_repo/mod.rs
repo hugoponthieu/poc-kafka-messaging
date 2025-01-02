@@ -1,8 +1,8 @@
-use std::{fmt::Error, pin::Pin, sync::Arc};
 use futures::Stream;
 use rdkafka::{consumer::Consumer, Message as _};
-use tokio_stream::wrappers::UnboundedReceiverStream;
-use tokio::sync::Mutex; // Changed to tokio::sync::Mutex
+use std::{fmt::Error, pin::Pin, sync::Arc};
+use tokio::{sync::Mutex, task::AbortHandle};
+use tokio_stream::wrappers::UnboundedReceiverStream; // Changed to tokio::sync::Mutex
 
 use crate::services::kafka_client::KafkaClient;
 
@@ -13,7 +13,12 @@ pub struct MessagesRepo {
 pub trait MessagesRepoTrait: Send + Sync {
     fn build(client: KafkaClient) -> MessagesRepo;
     // Changed return type to be explicit with Pin<Box>
-    fn get_topic_message_stream(&self) -> Pin<Box<dyn Stream<Item = Result<String, Error>> + Send>>;
+    fn get_topic_message_stream(
+        &self,
+    ) -> (
+        Pin<Box<dyn Stream<Item = Result<String, Error>> + Send>>,
+        AbortHandle,
+    );
 }
 
 impl MessagesRepoTrait for MessagesRepo {
@@ -23,13 +28,19 @@ impl MessagesRepoTrait for MessagesRepo {
         }
     }
 
-    fn get_topic_message_stream(&self) -> Pin<Box<dyn Stream<Item = Result<String, Error>> + Send>> {
+    fn get_topic_message_stream(
+        &self,
+    ) -> (
+        Pin<Box<dyn Stream<Item = Result<String, Error>> + Send>>,
+        AbortHandle,
+    ) {
         use tokio_stream::StreamExt;
         let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<String>();
         let tx = Arc::new(Mutex::new(tx));
         let client = self.client.clone();
+        let tx = tx.clone();
 
-        tokio::spawn(async move {
+        let abort_handle = tokio::spawn(async move {
             client
                 .consumer
                 .subscribe(&["first-course"])
@@ -43,7 +54,15 @@ impl MessagesRepoTrait for MessagesRepo {
                         let payload = borrowed_message.payload().unwrap_or(&[]);
                         let message_str = String::from_utf8_lossy(payload);
                         tracing::info!(%message_str);
-                        tx.lock().await.send(message_str.to_string()).unwrap();
+                        match tx.lock().await.send(message_str.to_string()){
+                            Ok(()) => {
+                                tracing::info!("message sent");
+                            }
+                            Err(e) => {
+                                println!("Failed to receive message: {}", e);
+                                return;
+                            }
+                        };
                         tracing::info!("message sent");
                     }
                     Err(e) => {
@@ -52,8 +71,11 @@ impl MessagesRepoTrait for MessagesRepo {
                     }
                 }
             }
-        });
-
-        Box::pin(UnboundedReceiverStream::new(rx).map(|msg: String| Ok(msg)))
+        })
+        .abort_handle();
+        (
+            Box::pin(UnboundedReceiverStream::new(rx).map(|msg: String| Ok(msg))),
+            abort_handle,
+        )
     }
 }
