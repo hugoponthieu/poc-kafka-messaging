@@ -6,7 +6,7 @@ pub struct KafkaClient {
     pub consumer: rdkafka::consumer::StreamConsumer,
 }
 
-pub trait KafkaClientTrait {
+pub trait KafkaClientTrait: Send + Sync {
     fn build(host: &str) -> KafkaClient;
 }
 
@@ -17,7 +17,7 @@ impl KafkaClientTrait for KafkaClient {
             .set("bootstrap.servers", host)
             .set("group.id", "my-group")
             .set("enable.partition.eof", "false")
-            .set("session.timeout.ms", "5000")
+            .set("session.timeout.ms", "6000")
             .set("enable.auto.commit", "true");
 
         let producer: rdkafka::producer::FutureProducer =
