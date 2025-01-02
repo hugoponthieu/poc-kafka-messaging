@@ -1,20 +1,19 @@
 use tracing_subscriber;
+use config::AppConfigTrait;
+mod config;
 mod messaging;
 mod routes;
-mod config;
-mod server; 
+mod server;
+mod services;
+
 
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt::init();
     let app_config = config::AppConfig::make();
+    let services = services::Services::build(&app_config.kafka_host);
     let routes = routes::create_route();
-    match server::serve_app(app_config.http_host, app_config.http_port, routes).await {
-        Ok(_) => {
-            tracing::info!("Server started successfully");
-        }
-        Err(e) => {
-            tracing::error!("Server failed to start: {}", e);
-        }
-    }
+    server::serve_app(app_config.http_host, app_config.http_port, routes)
+    .await
+    .expect("Server failed to start");
 }
