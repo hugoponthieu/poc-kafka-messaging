@@ -1,16 +1,20 @@
 use tracing_subscriber;
 mod messaging;
 mod routes;
-
+mod config;
+mod server; 
 
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt::init();
+    let app_config = config::AppConfig::make();
     let routes = routes::create_route();
-    
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:3000")
-        .await
-        .unwrap();
-    tracing::debug!("listening on {}", listener.local_addr().unwrap());
-    axum::serve(listener, routes).await.unwrap();
+    match server::serve_app(app_config.http_host, app_config.http_port, routes).await {
+        Ok(_) => {
+            tracing::info!("Server started successfully");
+        }
+        Err(e) => {
+            tracing::error!("Server failed to start: {}", e);
+        }
+    }
 }
