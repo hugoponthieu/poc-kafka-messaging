@@ -8,8 +8,7 @@ pub async fn stream_kafka_events_rdkafka(
     state: Repositories,
     message_input: UnboundedSender<Event>,
 ) -> AbortHandle {
-    let messages_repo = state.messages_repo.clone();
-    let repo = messages_repo.read().await;
+    let repo = state.messages_repo.read().await;
     // Get the stream and map it to Events
     let (mut raw_stream, handle_streaming_end) = repo.get_topic_message_stream();
 

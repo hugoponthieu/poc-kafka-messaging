@@ -1534,6 +1534,7 @@ dependencies = [
  "axum",
  "axum-extra",
  "clap",
+ "cmake",
  "futures",
  "kafka",
  "mongodb",

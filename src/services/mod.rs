@@ -1,6 +1,5 @@
 use std::error::Error;
 
-use futures::TryFutureExt;
 use kafka_client::KafkaClientTrait;
 use mongodb_client::MongoDBClientTrait;
 pub mod kafka_client;

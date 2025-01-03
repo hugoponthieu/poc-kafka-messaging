@@ -2,7 +2,7 @@ use futures::Stream;
 use model::Message;
 use mongodb::Collection;
 use rdkafka::{consumer::Consumer, Message as _};
-use std::{ error::Error, pin::Pin, sync::Arc};
+use std::{error::Error, pin::Pin, sync::Arc};
 use tokio::{sync::Mutex, task::AbortHandle};
 use tokio_stream::wrappers::UnboundedReceiverStream; // Changed to tokio::sync::Mutex
 
@@ -17,10 +17,10 @@ pub struct MessagesRepo {
 pub trait MessagesRepoTrait: Send + Sync {
     fn build(services: Services) -> MessagesRepo;
     // Changed return type to be explicit with Pin<Box>
-     fn get_topic_message_stream(
+    fn get_topic_message_stream(
         &self,
     ) -> (
-        Pin<Box<dyn Stream<Item = Result<String, Box<dyn Error>>> + Send>>,
+        Pin<Box<dyn Stream<Item = Result<Message, Box<dyn Error>>> + Send>>,
         AbortHandle,
     );
 
@@ -41,14 +41,14 @@ impl MessagesRepoTrait for MessagesRepo {
             .client
             .database("beep")
             .collection("messages");
-        message_collection.insert_one(&message).await?;
+        let _ = message_collection.insert_one(&message).await?;
         Ok(message)
     }
 
     fn get_topic_message_stream(
         &self,
     ) -> (
-        Pin<Box<dyn Stream<Item = Result<String, Box<dyn Error>>> + Send>>,
+        Pin<Box<dyn Stream<Item = Result<Message, Box<dyn Error>>> + Send>>,
         AbortHandle,
     ) {
         use tokio_stream::StreamExt;
@@ -91,7 +91,12 @@ impl MessagesRepoTrait for MessagesRepo {
         })
         .abort_handle();
         (
-            Box::pin(UnboundedReceiverStream::new(rx).map(|msg: String| Ok(msg))),
+            Box::pin(UnboundedReceiverStream::new(rx).map(|msg: String| {
+                Ok(Message {
+                    _id: None,
+                    content: msg,
+                })
+            })),
             abort_handle,
         )
     }

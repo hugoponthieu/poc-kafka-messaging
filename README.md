@@ -23,3 +23,18 @@ Then cargo run in another terminal to run the service:
 ```bash
 cargo run
 ```
+
+
+## Description
+
+```
+└── src
+    ├── config        # Configure the Http server, access to services...
+    ├── main.rs
+    ├── recorder      # Record that arrive from the Kafka topic in the database
+    ├── messaging     # Logic handle http call from clients
+    ├── repositories  # High level implementation of the business logic
+    ├── routes        # Define the routes of the application
+    ├── server        # Start the HTTP server
+    └── services      # Instantiation and acknoledgement of the services (Mongo, Kafka)
+```
