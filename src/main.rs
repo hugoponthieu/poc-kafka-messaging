@@ -15,7 +15,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app_config = config::AppConfig::make();
     let services =
         services::Services::build(&app_config.kafka_host, &app_config.mongodb_host).await?;
-    let repos = repositories::Repositories::build(services.kafka_client);
+    let repos = repositories::Repositories::build(services);
     let routes = routes::create_route(repos);
     server::serve_app(app_config.http_host, app_config.http_port, routes).await?;
     Ok(())
