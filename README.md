@@ -1,4 +1,4 @@
-# Simple messaging microservice with Kafka and Rust
+# Simple messaging service with Kafka, Mongodb written with Rust
 
 To launch the stack, run:
 
@@ -6,13 +6,24 @@ To launch the stack, run:
 docker-compose up -d 
 ```
 
-Then create a topic:
+Then create a kafka topic:
 
 ```bash
 docker exec -it first-course-kafka-1 /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --topic first-course
 ```
+Create the mongo database and collection:
 
-Then run the producer:
+```bash
+docker exec -it first-course-mongodb-1 mongosh
+```
+
+Then in the MongoDB shell, run these commands:
+```mongosh
+use beep
+db.createCollection("messages")
+```
+
+Then run the kafka producer:
 
 ```bash
 docker exec --workdir /opt/kafka/bin/ -it first-course-kafka-1 sh ./kafka-console-producer.sh --bootstrap-server localhost:9092 --topic first-course
@@ -24,6 +35,11 @@ Then cargo run in another terminal to run the service:
 cargo run
 ```
 
+To receive messages throught sse you can simply: 
+
+```bash
+curl -N http://localhost:8080/sse
+```
 
 ## Description
 

@@ -17,8 +17,7 @@ impl KafkaClientTrait for KafkaClient {
             .set("bootstrap.servers", host)
             .set("group.id", "my-group")
             .set("enable.partition.eof", "false")
-            .set("session.timeout.ms", "6000")
-            .set("enable.auto.commit", "true");
+            .set("session.timeout.ms", "6000");
 
         let producer: rdkafka::producer::FutureProducer =
             client.create().expect("Producer creation error");

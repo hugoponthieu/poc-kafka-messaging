@@ -20,11 +20,12 @@ pub trait MessagesRepoTrait: Send + Sync {
     fn get_topic_message_stream(
         &self,
     ) -> (
-        Pin<Box<dyn Stream<Item = Result<Message, Box<dyn Error>>> + Send>>,
+        Pin<Box<dyn Stream<Item = Result<Message, Box<dyn Error + Send + Sync>>> + Sync + Send>>,
         AbortHandle,
     );
 
-    async fn save_message(&self, message: Message) -> Result<Message, Box<dyn Error>>;
+    async fn save_message(&self, message: Message)
+        -> Result<Message, Box<dyn Error + Send + Sync>>;
 }
 
 impl MessagesRepoTrait for MessagesRepo {
@@ -35,20 +36,10 @@ impl MessagesRepoTrait for MessagesRepo {
         }
     }
 
-    async fn save_message(&self, message: Message) -> Result<Message, Box<dyn Error>> {
-        let message_collection: Collection<Message> = self
-            .mongodb_client
-            .client
-            .database("beep")
-            .collection("messages");
-        let _ = message_collection.insert_one(&message).await?;
-        Ok(message)
-    }
-
     fn get_topic_message_stream(
         &self,
     ) -> (
-        Pin<Box<dyn Stream<Item = Result<Message, Box<dyn Error>>> + Send>>,
+        Pin<Box<dyn Stream<Item = Result<Message, Box<dyn Error + Send + Sync>>> + Sync + Send>>,
         AbortHandle,
     ) {
         use tokio_stream::StreamExt;
@@ -72,15 +63,12 @@ impl MessagesRepoTrait for MessagesRepo {
                         let message_str = String::from_utf8_lossy(payload);
                         tracing::info!(%message_str);
                         match tx.lock().await.send(message_str.to_string()) {
-                            Ok(()) => {
-                                tracing::info!("message sent");
-                            }
+                            Ok(()) => tracing::info!("message sent"),
                             Err(e) => {
                                 tracing::error!("Failed to receive message: {}", e);
                                 return;
                             }
                         };
-                        tracing::info!("message sent");
                     }
                     Err(e) => {
                         tracing::error!("Failed to receive message: {}", e);
@@ -93,11 +81,24 @@ impl MessagesRepoTrait for MessagesRepo {
         (
             Box::pin(UnboundedReceiverStream::new(rx).map(|msg: String| {
                 Ok(Message {
-                    _id: None,
+                    id: None,
                     content: msg,
                 })
             })),
             abort_handle,
         )
+    }
+
+    async fn save_message(
+        &self,
+        message: Message,
+    ) -> Result<Message, Box<dyn Error + Send + Sync>> {
+        let message_collection: Collection<Message> = self
+            .mongodb_client
+            .client
+            .database("beep")
+            .collection("messages");
+        let _ = message_collection.insert_one(&message).await?;
+        Ok(message)
     }
 }

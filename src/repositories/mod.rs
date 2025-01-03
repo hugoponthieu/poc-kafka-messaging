@@ -3,11 +3,7 @@ use std::sync::Arc;
 use messages_repo::MessagesRepoTrait;
 use tokio::sync::RwLock;
 
-use crate::services::{
-    kafka_client,
-    mongodb_client::{self, MongoDBClient},
-    Services,
-};
+use crate::services::Services;
 
 pub mod messages_repo;
 

@@ -6,6 +6,13 @@ services:
     image: apache/kafka
     ports:
       - '9092:9092'
+  mongodb:
+    image: mongo:latest
+    ports:
+      - '27017:27017'
+    environment:
+      - MONGO_INITDB_DATABASE=beep
+
 
 
 # CREATE A TOPIC

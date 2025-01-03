@@ -1,4 +1,11 @@
-use crate::repositories::{messages_repo::MessagesRepoTrait, Repositories};
+use std::sync::Arc;
+
+use tokio_stream::StreamExt;
+
+use crate::repositories::{
+    messages_repo::MessagesRepoTrait,
+    Repositories,
+};
 
 pub struct Recorder {
     pub repositories: Repositories,
@@ -9,7 +16,7 @@ pub trait RecorderBuilder: Send + Sync {
 }
 
 pub trait RecorderMethods: Send + Sync {
-    async fn start(&self) -> Result<(), Box<dyn std::error::Error>>;
+    async fn start(self) -> Result<(), Box<dyn std::error::Error+ Send + Sync>>;
 }
 
 impl RecorderBuilder for Recorder {
@@ -19,15 +26,34 @@ impl RecorderBuilder for Recorder {
 }
 
 impl RecorderMethods for Recorder {
-    async fn start(&self) -> Result<(), Box<dyn std::error::Error>> {
-        let message_repo = self.repositories.messages_repo.read().await;
-        let (stream, _) = message_repo.get_topic_message_stream();
+    async fn start(self) -> Result<(), Box<dyn std::error::Error+ Send + Sync>> {
+        tracing::info!("preparing recorder");
+        let recorder = Arc::new(self);
 
-        tokio::spawn(async {
-            loop {
-                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+        let message_repo = recorder.repositories.messages_repo.read().await;
+        tracing::info!("got recorder");
+
+        let (mut stream, _) = message_repo.get_topic_message_stream();
+        
+        let repo = recorder.clone().repositories.messages_repo.clone();
+        tokio::spawn(async move {
+            tracing::debug!("Recorder ready");
+            while let Some(message) = stream.next().await {
+                let msg = match message {
+                    Ok(msg) => msg,
+                    Err(_) => continue,
+                };
+                tracing::debug!("got message");
+                
+                if let Err(e) = repo.read().await.save_message(msg).await {
+                      tracing::error!("Failed to save message: {}", e);
+                      continue;
+                  }           
             }
+            tracing::debug!("got message");
+
         });
+        tracing::info!("Recorder started");
         Ok(())
     }
 }
