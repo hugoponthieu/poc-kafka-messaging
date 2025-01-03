@@ -21,5 +21,9 @@ pub async fn sse_handler(
     });
     let stream = tokio_stream::wrappers::UnboundedReceiverStream::new(sse_event_stream).map(Ok);
 
-    Sse::new(stream)
+    Sse::new(stream).keep_alive(
+        axum::response::sse::KeepAlive::new()
+            .interval(std::time::Duration::from_secs(1))
+            .text("keep-alive-text")
+    )
 }
